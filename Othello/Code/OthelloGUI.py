@@ -11,8 +11,6 @@ from tkinter import *
 from tkinter.messagebox import *
 from Othello import Othello
 import random
-
-
 class OthelloGUI:
     def __init__(self):
         self.root = Tk('黑白棋')
@@ -242,8 +240,8 @@ class OthelloGUI:
         '''
         if self.gameOver is False and self.turn == 'computer':
             # print("move:",self.getComputerMove(self.mainBoard, self.computerTile) )
-            x, y = self.getComputerMove(self.mainBoard, self.computerTile)  # 电脑AI走法
-            # x,y =self.get_AI_move(self.computerTile)
+            # x, y = self.getComputerMove(self.mainBoard, self.computerTile)  # 电脑AI走法
+            x,y =self.get_AI_move(self.computerTile)
             self.makeMove(self.mainBoard, self.computerTile, x, y)
             savex, savey = x, y
             # 玩家没有可行的走法了，则电脑继续，否则切换到玩家走
@@ -274,6 +272,7 @@ class OthelloGUI:
         :param tile:
         :return:
         '''
+        # 贪心
         inf = 1e8
         
         def cal_values(curboard, tile):
@@ -343,6 +342,7 @@ class OthelloGUI:
         return a        
 
     def get_baseline_2_move(self,tile):
+        #同学的，拿来碰一碰
         def get_score_of_board(board):
             board_weights = [
                 [900, -20, 20, 5, 5, 20, -20, 900],
@@ -597,7 +597,9 @@ class OthelloGUI:
         start_time = time.perf_counter()    
         a = minmax(5, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
         end_time = time.perf_counter()
-        if end_time - start_time < 1:
+        if end_time - start_time < 0.1:
+            a = minmax(7, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
+        elif end_time - start_time < 1:
             a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
         end_time = time.perf_counter()
         print(end_time - start_time)
@@ -733,4 +735,4 @@ class OthelloGUI:
 
 if __name__ == '__main__':
     # mode=0 是人机对战模式、mode=1是机器对战模式
-    OthelloGUI().start(mode=1)
+    OthelloGUI().start(mode=0)
