@@ -548,9 +548,16 @@ class OthelloGUI:
         '''
         self.AI_player = '2020111475-顾永威'
         inf = 1e8
-        
+        weight_matrix = [[20, -3, 11, 8, 8, 11, -3, 20],
+                        [-3, -7, -4, 1, 1, -4, -7, -3],
+                        [11, -4, 2, 2, 2, 2, -4, 11],
+                        [8, 1, 2, -3, -3, 2, 1, 8],
+                        [8, 1, 2, -3, -3, 2, 1, 8],
+                        [11, -4, 2, 2, 2, 2, -4, 11],
+                        [-3, -7, -4, 1, 1, -4, -7, -3],
+                        [20, -3, 11, 8, 8, 11, -3, 20]]        
         #Heuristic function:Component-wise Heuristic with Dynamic Weights
-        def cal_values(curboard, tile, weight_matrix):
+        def cal_values(curboard, tile):
             another = "white" if tile == "black" else "black"
             my_tiles = 0
             opp_tiles = 0
@@ -657,19 +664,12 @@ class OthelloGUI:
             val = 10*p + 801.724*c + 382.026*l + 78.922*m + 74.396*f + 10*d
             return val
         
-        weight = [[20, -3, 11, 8, 8, 11, -3, 20],
-                        [-3, -7, -4, 1, 1, -4, -7, -3],
-                        [11, -4, 2, 2, 2, 2, -4, 11],
-                        [8, 1, 2, -3, -3, 2, 1, 8],
-                        [8, 1, 2, -3, -3, 2, 1, 8],
-                        [11, -4, 2, 2, 2, 2, -4, 11],
-                        [-3, -7, -4, 1, 1, -4, -7, -3],
-                        [20, -3, 11, 8, 8, 11, -3, 20]]
+
         
-        def minmax(maxdepth, depth, current_board, player_tile, current_tile, moves, alpha, beta, weight_matrix):
+        def minmax(maxdepth, depth, current_board, player_tile, current_tile, moves, alpha, beta):
             #Terminating condition
             if depth == maxdepth:
-                return cal_values(current_board, player_tile, weight_matrix), moves
+                return cal_values(current_board, player_tile), moves
             
             if current_tile == player_tile:
                 best = -inf
@@ -681,7 +681,7 @@ class OthelloGUI:
                     dupeBoard = self.getBoardCopy(current_board)
                     self.makeMove(dupeBoard, current_tile, possibleMoves[i][0], possibleMoves[i][1])
                     next_tile = "white" if current_tile == "black" else "black"
-                    val,move = minmax(maxdepth,depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta, weight_matrix)
+                    val,move = minmax(maxdepth,depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta)
                     if best <= val:
                         best = val
                         best_move = possibleMoves[i]
@@ -700,7 +700,7 @@ class OthelloGUI:
                     dupeBoard = self.getBoardCopy(current_board)
                     self.makeMove(dupeBoard, current_tile, possibleMoves[i][0], possibleMoves[i][1])
                     next_tile = "white" if current_tile == "black" else "black"
-                    val,move = minmax(maxdepth, depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta, weight_matrix)
+                    val,move = minmax(maxdepth, depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta)
                     if best > val:
                         best = val
                         best_move = possibleMoves[i]
@@ -710,12 +710,12 @@ class OthelloGUI:
                         break
                 return best, best_move
         start_time = time.perf_counter()    
-        a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf, weight)[1]
+        a = minmax(5, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
         end_time = time.perf_counter()
         if end_time - start_time < 0.1:
-            a = minmax(7, 0, self.mainBoard, tile, tile, [], -inf, inf, weight)[1]
+            a = minmax(7, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
         elif end_time - start_time < 1:
-            a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf, weight)[1]
+            a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
         end_time = time.perf_counter()
         print("AI:",end_time - start_time)
         return a
