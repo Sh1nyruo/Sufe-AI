@@ -272,173 +272,11 @@ class OthelloGUI:
         :param tile:
         :return:
         '''
-        # 贪心
         inf = 1e8
-        
-        def cal_values(curboard, tile):
-            another = "white" if tile == "black" else "black"
-            my_tiles = len(self.getValidMoves(curboard, tile))
-            opp_tiles = len(self.getValidMoves(curboard, another))
-            
-            if my_tiles > opp_tiles:
-                return (100 * my_tiles) / (my_tiles + opp_tiles)
-            elif my_tiles < opp_tiles:
-                return - (100 * opp_tiles) / (my_tiles + opp_tiles)
-            else:
-                return 0
-        
-        
-        
-        def minmax(maxdepth, depth, current_board, player_tile, current_tile, moves, alpha, beta):
-            #Terminating condition
-            if depth == maxdepth:
-                return cal_values(current_board, player_tile), moves
-            
-            if current_tile == player_tile:
-                best = -inf
-                best_move = []
-                possibleMoves = self.getValidMoves(current_board, current_tile)
-                if len(possibleMoves) == 0:
-                    return cal_values(current_board, player_tile), None
-                for i in range(0,len(possibleMoves)):
-                    dupeBoard = self.getBoardCopy(current_board)
-                    self.makeMove(dupeBoard, current_tile, possibleMoves[i][0], possibleMoves[i][1])
-                    next_tile = "white" if current_tile == "black" else "black"
-                    val,move = minmax(maxdepth,depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta)
-                    if best <= val:
-                        best = val
-                        best_move = possibleMoves[i]
-                    alpha = max(alpha, best)
-                    
-                    if beta <= alpha:
-                        break
-                return best,best_move
-            else:
-                best = inf
-                best_move = []
-                possibleMoves = self.getValidMoves(current_board, current_tile)
-                if len(possibleMoves) == 0:
-                    return cal_values(current_board, player_tile), None
-                for i in range(0,len(possibleMoves)):
-                    dupeBoard = self.getBoardCopy(current_board)
-                    self.makeMove(dupeBoard, current_tile, possibleMoves[i][0], possibleMoves[i][1])
-                    next_tile = "white" if current_tile == "black" else "black"
-                    val,move = minmax(maxdepth, depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta)
-                    if best > val:
-                        best = val
-                        best_move = possibleMoves[i]
-                    beta = min(beta, best)
-                    
-                    if beta <= alpha:
-                        break
-                return best, best_move
-        start_time = time.perf_counter()    
-        a = minmax(5, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
-        end_time = time.perf_counter()
-        if end_time - start_time < 1:
-            a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
-        end_time = time.perf_counter()
-        print("AI time:",end_time - start_time)
-        return a        
-
-    def get_baseline_2_move(self,tile):
-        #同学的，拿来碰一碰
-        def get_score_of_board(board):
-            board_weights = [
-                [900, -20, 20, 5, 5, 20, -20, 900],
-                [-20, -40, -5, -5, -5, -5, -40, -20],
-                [20, -5, 15, 3, 3, 15, -5, 20],
-                [5, -5, 3, 3, 3, 3, -5, 5],
-                [5, -5, 3, 3, 3, 3, -5, 5],
-                [20, -5, 15, 3, 3, 15, -5, 20],
-                [-20, -40, -5, -5, -5, -5, -40, -20],
-                [900, -20, 20, 5, 5, 20, -20, 900]
-            ]
-            b_score = 0
-            w_score = 0
-            for x in range(8):
-                for y in range(8):
-                    if board[x][y] == 'black':
-                        b_score += board_weights[x][y]
-                    if board[x][y] == 'white':
-                        w_score += board_weights[x][y]
-            return {'black': b_score, 'white': w_score}
-        
-
-        if tile == "white":
-            _tile = "black"
-        if tile == "black":
-            _tile = "white"
-
-
-        board = self.getBoardCopy(self.mainBoard)
-
-        def do_minimax_with_alpha_beta(board, tile, depth, my_best, opp_best):
-            if depth == 0:
-                return (get_score_of_board(board)[tile], None)
-
-            move_list = self.getValidMoves(board, tile)
-
-            if not move_list:
-                return (get_score_of_board(board)[tile], None)
-
-            for x, y in move_list:
-                if self.othello.isOnCorner(x, y):
-                    return (get_score_of_board(board)[tile],[x, y])
-            best_score = my_best
-            best_move = None
-
-            for move in move_list:
-                x, y = move
-                new_board = self.getBoardCopy(board)
-                self.makeMove(new_board, tile, x, y)
-                try_tuple = do_minimax_with_alpha_beta(new_board, _tile, depth - 1, -opp_best, -best_score)
-                try_score = -try_tuple[0]
-
-                if try_score > best_score:
-                    best_score = try_score
-                    best_move = move
-
-                if best_score >= opp_best:   #剪枝操作
-                    return (best_score, best_move)
-
-            return (best_score, best_move)
-        
-        start_time =time.perf_counter()
-        score, action = do_minimax_with_alpha_beta(board, tile, 7, -1000, 1000)
-        end_time = time.perf_counter()
-        print("你的时间:", end_time-start_time)
-        return action
-
-    def get_baseline_move(self,tile,baseline_num=2):
-        '''
-        获取baseline的落子位置
-        :param tile: 棋子的颜色的字符串，值为“white”或者“black”
-        :param baseline_num: baseline的编号
-        :return: 返回一个最佳的落子位置[x,y]，如果没有落子位置或baseline编号不合规范，返回None
-        '''
-        if baseline_num==0:
-            return self.random_move(tile)
-        elif baseline_num==1:
-            return self.get_baseline_1_move(tile)
-        elif baseline_num==2:
-            return self.get_baseline_2_move(tile)
-        else:
-            return None
-
-    def get_AI_move(self,tile):
-        '''
-        这里是同学们需要实现的策略，默认是随机算法，主要是为了让程序跑起来
-        同学们需要删掉return这一行，换上自己的算法
-        程序的第一行为:self.AI_player='2018110110-张三'，替换成自己的学号-姓名，方便后续程序自动批阅
-        :param tile:  棋子颜色的字符串，值为“white”或者“black”
-        :return:  返回一个最佳的落子位置[x,y]，如果当前棋子没有可走位置，返回None
-        '''
-        self.AI_player = '2020111475-顾永威'
-        inf = 1e8
+        progress = self.getScoreOfBoard(self.mainBoard)["black"]+self.getScoreOfBoard(self.mainBoard)["white"]
         
         #Heuristic function:Component-wise Heuristic with Dynamic Weights
-        def cal_values(curboard, tile):
+        def cal_values(curboard, tile, situation):
             another = "white" if tile == "black" else "black"
             my_tiles = 0
             opp_tiles = 0
@@ -548,25 +386,30 @@ class OthelloGUI:
             elif my_tiles < opp_tiles:
                 m = -(100 * opp_tiles)/(my_tiles+opp_tiles)
                 
-            return 10*p + 801.724 * c + 382.026 * l + 78.922 * m + 74.396 * f + 10 * d
+
+            cof_1 = 0.2*situation if situation <= 60 else situation**2
+            cof_2 = 5 * situation
+            cof_3 = 10 * situation if situation <=20 else situation
+            cof_4 = -0.5 * situation + 64
+            val = p*cof_1 + c*cof_2 + l*cof_3 + m*cof_4 + f*cof_2 + d*cof_1
+            return val
             
-            
-        def minmax(maxdepth, depth, current_board, player_tile, current_tile, moves, alpha, beta):
+        def minmax(maxdepth, depth, current_board, player_tile, current_tile, moves, alpha, beta, situation):
             #Terminating condition
             if depth == maxdepth:
-                return cal_values(current_board, player_tile), moves
+                return cal_values(current_board, player_tile, situation), moves
             
             if current_tile == player_tile:
                 best = -inf
                 best_move = []
                 possibleMoves = self.getValidMoves(current_board, current_tile)
                 if len(possibleMoves) == 0:
-                    return cal_values(current_board, player_tile), None
+                    return 0, None
                 for i in range(0,len(possibleMoves)):
                     dupeBoard = self.getBoardCopy(current_board)
                     self.makeMove(dupeBoard, current_tile, possibleMoves[i][0], possibleMoves[i][1])
                     next_tile = "white" if current_tile == "black" else "black"
-                    val,move = minmax(maxdepth,depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta)
+                    val,move = minmax(maxdepth,depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta, situation)
                     if best <= val:
                         best = val
                         best_move = possibleMoves[i]
@@ -580,12 +423,284 @@ class OthelloGUI:
                 best_move = []
                 possibleMoves = self.getValidMoves(current_board, current_tile)
                 if len(possibleMoves) == 0:
-                    return cal_values(current_board, player_tile), None
+                    return 0, None
                 for i in range(0,len(possibleMoves)):
                     dupeBoard = self.getBoardCopy(current_board)
                     self.makeMove(dupeBoard, current_tile, possibleMoves[i][0], possibleMoves[i][1])
                     next_tile = "white" if current_tile == "black" else "black"
-                    val,move = minmax(maxdepth, depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta)
+                    val,move = minmax(maxdepth, depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta, situation)
+                    if best > val:
+                        best = val
+                        best_move = possibleMoves[i]
+                    beta = min(beta, best)
+                    
+                    if beta <= alpha:
+                        break
+                return best, best_move
+        start_time = time.perf_counter()
+        d = 5
+        a = minmax(5, 0, self.mainBoard, tile, tile, [], -inf, inf, progress)[1]
+        end_time = time.perf_counter()
+        '''
+        if end_time - start_time < 0.1:
+            a = minmax(7, 0, self.mainBoard, tile, tile, [], -inf, inf, progress)[1]
+            d = 7
+        elif end_time - start_time < 1:
+            a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf, progress)[1]
+            d = 6
+        end_time = time.perf_counter()
+        '''
+        print("\n\n棋子：{}\n深度：{}\n用时:{}\n\n".format(tile,d,end_time-start_time))
+        return a        
+
+    def get_baseline_2_move(self,tile):
+        #同学的，拿来碰一碰
+        def get_score_of_board(board):
+            board_weights = [
+                [900, -20, 20, 5, 5, 20, -20, 900],
+                [-20, -40, -5, -5, -5, -5, -40, -20],
+                [20, -5, 15, 3, 3, 15, -5, 20],
+                [5, -5, 3, 3, 3, 3, -5, 5],
+                [5, -5, 3, 3, 3, 3, -5, 5],
+                [20, -5, 15, 3, 3, 15, -5, 20],
+                [-20, -40, -5, -5, -5, -5, -40, -20],
+                [900, -20, 20, 5, 5, 20, -20, 900]
+            ]
+            b_score = 0
+            w_score = 0
+            for x in range(8):
+                for y in range(8):
+                    if board[x][y] == 'black':
+                        b_score += board_weights[x][y]
+                    if board[x][y] == 'white':
+                        w_score += board_weights[x][y]
+            return {'black': b_score, 'white': w_score}
+        
+
+        if tile == "white":
+            _tile = "black"
+        if tile == "black":
+            _tile = "white"
+
+
+        board = self.getBoardCopy(self.mainBoard)
+
+        def do_minimax_with_alpha_beta(board, tile, depth, my_best, opp_best):
+            if depth == 0:
+                return (get_score_of_board(board)[tile], None)
+
+            move_list = self.getValidMoves(board, tile)
+
+            if not move_list:
+                return (get_score_of_board(board)[tile], None)
+
+            for x, y in move_list:
+                if self.othello.isOnCorner(x, y):
+                    return (get_score_of_board(board)[tile],[x, y])
+            best_score = my_best
+            best_move = None
+
+            for move in move_list:
+                x, y = move
+                new_board = self.getBoardCopy(board)
+                self.makeMove(new_board, tile, x, y)
+                try_tuple = do_minimax_with_alpha_beta(new_board, _tile, depth - 1, -opp_best, -best_score)
+                try_score = -try_tuple[0]
+
+                if try_score > best_score:
+                    best_score = try_score
+                    best_move = move
+
+                if best_score >= opp_best:   #剪枝操作
+                    return (best_score, best_move)
+
+            return (best_score, best_move)
+        
+        start_time =time.perf_counter()
+        score, action = do_minimax_with_alpha_beta(board, tile, 6, -1000, 1000)
+        end_time = time.perf_counter()
+        print("你的时间:", end_time-start_time)
+        return action
+
+    def get_baseline_move(self,tile,baseline_num=2):
+        '''
+        获取baseline的落子位置
+        :param tile: 棋子的颜色的字符串，值为“white”或者“black”
+        :param baseline_num: baseline的编号
+        :return: 返回一个最佳的落子位置[x,y]，如果没有落子位置或baseline编号不合规范，返回None
+        '''
+        if baseline_num==0:
+            return self.random_move(tile)
+        elif baseline_num==1:
+            return self.get_baseline_1_move(tile)
+        elif baseline_num==2:
+            return self.get_baseline_2_move(tile)
+        else:
+            return None
+
+    def get_AI_move(self,tile):
+        '''
+        这里是同学们需要实现的策略，默认是随机算法，主要是为了让程序跑起来
+        同学们需要删掉return这一行，换上自己的算法
+        程序的第一行为:self.AI_player='2018110110-张三'，替换成自己的学号-姓名，方便后续程序自动批阅
+        :param tile:  棋子颜色的字符串，值为“white”或者“black”
+        :return:  返回一个最佳的落子位置[x,y]，如果当前棋子没有可走位置，返回None
+        '''
+        self.AI_player = '2020111475-顾永威'
+        inf = 1e8
+        
+        #Heuristic function:Component-wise Heuristic with Dynamic Weights
+        def cal_values(curboard, tile, weight_matrix):
+            another = "white" if tile == "black" else "black"
+            my_tiles = 0
+            opp_tiles = 0
+            my_front_tiles = 0
+            opp_front_tiles = 0
+            
+            X_dt = [-1,-1,0,1,1,1,0,-1]
+            Y_dt = [0,1,1,1,0,-1,-1,-1]
+
+            d = 0
+            for i in range(8):
+                for j in range(8):
+                    if curboard[i][j] == tile:
+                        d += weight_matrix[i][j]
+                        my_tiles += 1
+                    elif curboard[i][j] == another:
+                        d -= weight_matrix[i][j]
+                        opp_tiles += 1
+                    if curboard[i][j] != 'none':
+                        for k in range(8):
+                            x = i + X_dt[k]
+                            y = j + Y_dt[k]
+                            if x>=0 and x<8 and y>=0 and y<8 and curboard[x][y] == 'none':
+                                if curboard[i][j] == tile: my_front_tiles += 1
+                                else: opp_front_tiles += 1
+                                break
+            p = 0
+            if my_tiles > opp_tiles:
+                p = 100 * my_tiles / (my_tiles + opp_tiles)
+            elif my_tiles < opp_tiles:
+                p = - (100 * opp_tiles) / (my_tiles + opp_tiles)
+            else:
+                p = 0
+            
+            f = 0
+            if my_front_tiles > opp_front_tiles:
+                f = - (100 * my_front_tiles)/(my_front_tiles+opp_front_tiles)
+            elif my_front_tiles < opp_front_tiles:
+                f = (100 * my_front_tiles)/(my_front_tiles+opp_front_tiles)
+            else:
+                f = 0
+            
+            c = 0
+            my_tiles = opp_tiles = 0
+            if curboard[0][0] == tile:
+                my_tiles += 1
+            elif curboard[0][0] == another:
+                opp_tiles += 1
+            if curboard[0][7] == tile:
+                my_tiles += 1
+            elif curboard[0][7] == another:
+                opp_tiles += 1               
+            if curboard[7][0] == tile:
+                my_tiles += 1
+            elif curboard[7][0] == another:
+                opp_tiles += 1   
+            if curboard[7][7] == tile:
+                my_tiles += 1
+            elif curboard[7][7] == another:
+                opp_tiles += 1
+            c = 25 * (my_tiles - opp_tiles)
+            
+            l = 0
+            my_tiles = opp_tiles = 0
+            if curboard[0][0] == 'none':
+                if curboard[0][1] == tile: my_tiles += 1
+                elif curboard[0][1] == another: opp_tiles += 1
+                if curboard[1][1] == tile: my_tiles += 1
+                elif curboard[1][1] == another: opp_tiles += 1
+                if curboard[1][0] == tile: my_tiles += 1
+                elif curboard[1][0] == another: opp_tiles += 1
+            if curboard[0][7] == 'none':
+                if curboard[0][6] == tile: my_tiles += 1
+                elif curboard[0][6] == another: opp_tiles += 1
+                if curboard[1][6] == tile: my_tiles += 1
+                elif curboard[1][6] == another: opp_tiles += 1
+                if curboard[1][7] == tile: my_tiles += 1
+                elif curboard[1][7] == another: opp_tiles += 1
+            if curboard[7][0] == 'none':
+                if curboard[7][1] == tile: my_tiles += 1
+                elif curboard[7][1] == another: opp_tiles += 1
+                if curboard[6][1] == tile: my_tiles += 1
+                elif curboard[6][1] == another: opp_tiles += 1
+                if curboard[6][0] == tile: my_tiles += 1
+                elif curboard[6][0] == another: opp_tiles += 1
+            if curboard[7][7] == 'none':
+                if curboard[6][7] == tile: my_tiles += 1
+                elif curboard[6][7] == another: opp_tiles += 1
+                if curboard[6][6] == tile: my_tiles += 1
+                elif curboard[6][6] == another: opp_tiles += 1
+                if curboard[7][6] == tile: my_tiles += 1
+                elif curboard[7][6] == another: opp_tiles += 1
+            l = -12.5 * (my_tiles - opp_tiles)
+            
+            m = 0                   
+            my_tiles = len(self.getValidMoves(curboard, tile))
+            opp_tiles = len(self.getValidMoves(curboard, another))
+            if my_tiles > opp_tiles:
+                m = (100 * my_tiles)/(my_tiles+opp_tiles)
+            elif my_tiles < opp_tiles:
+                m = -(100 * opp_tiles)/(my_tiles+opp_tiles)
+            
+
+            val = 10*p + 801.724*c + 382.026*l + 78.922*m + 74.396*f + 10*d
+            return val
+        
+        weight = [[20, -3, 11, 8, 8, 11, -3, 20],
+                        [-3, -7, -4, 1, 1, -4, -7, -3],
+                        [11, -4, 2, 2, 2, 2, -4, 11],
+                        [8, 1, 2, -3, -3, 2, 1, 8],
+                        [8, 1, 2, -3, -3, 2, 1, 8],
+                        [11, -4, 2, 2, 2, 2, -4, 11],
+                        [-3, -7, -4, 1, 1, -4, -7, -3],
+                        [20, -3, 11, 8, 8, 11, -3, 20]]
+        
+        def minmax(maxdepth, depth, current_board, player_tile, current_tile, moves, alpha, beta, weight_matrix):
+            #Terminating condition
+            if depth == maxdepth:
+                return cal_values(current_board, player_tile, weight_matrix), moves
+            
+            if current_tile == player_tile:
+                best = -inf
+                best_move = []
+                possibleMoves = self.getValidMoves(current_board, current_tile)
+                if len(possibleMoves) == 0:
+                    return 0, None
+                for i in range(0,len(possibleMoves)):
+                    dupeBoard = self.getBoardCopy(current_board)
+                    self.makeMove(dupeBoard, current_tile, possibleMoves[i][0], possibleMoves[i][1])
+                    next_tile = "white" if current_tile == "black" else "black"
+                    val,move = minmax(maxdepth,depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta, weight_matrix)
+                    if best <= val:
+                        best = val
+                        best_move = possibleMoves[i]
+                    alpha = max(alpha, best)
+                    
+                    if beta <= alpha:
+                        break
+                return best,best_move
+            else:
+                best = inf
+                best_move = []
+                possibleMoves = self.getValidMoves(current_board, current_tile)
+                if len(possibleMoves) == 0:
+                    return 0, None
+                for i in range(0,len(possibleMoves)):
+                    dupeBoard = self.getBoardCopy(current_board)
+                    self.makeMove(dupeBoard, current_tile, possibleMoves[i][0], possibleMoves[i][1])
+                    next_tile = "white" if current_tile == "black" else "black"
+                    val,move = minmax(maxdepth, depth+1, dupeBoard, player_tile, next_tile, possibleMoves[i], alpha, beta, weight_matrix)
                     if best > val:
                         best = val
                         best_move = possibleMoves[i]
@@ -595,14 +710,14 @@ class OthelloGUI:
                         break
                 return best, best_move
         start_time = time.perf_counter()    
-        a = minmax(5, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
+        a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf, weight)[1]
         end_time = time.perf_counter()
         if end_time - start_time < 0.1:
-            a = minmax(7, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
+            a = minmax(7, 0, self.mainBoard, tile, tile, [], -inf, inf, weight)[1]
         elif end_time - start_time < 1:
-            a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
+            a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf, weight)[1]
         end_time = time.perf_counter()
-        print(end_time - start_time)
+        print("AI:",end_time - start_time)
         return a
         
     def white_move(self, tile='white'):
@@ -621,8 +736,8 @@ class OthelloGUI:
         :return: 返回一个最佳的落子位置[x,y]
         '''
         # baseline的策略也可自定义，通过设置get_baseline_move函数的baseline_num进行调用
-        return self.get_baseline_move(tile, 2)
-        # return self.get_AI_move(tile)
+        #return self.get_baseline_move(tile, 1)
+        return self.get_AI_move(tile)
 
     def program_go(self, playerTile):
         '''
@@ -735,4 +850,4 @@ class OthelloGUI:
 
 if __name__ == '__main__':
     # mode=0 是人机对战模式、mode=1是机器对战模式
-    OthelloGUI().start(mode=0)
+    OthelloGUI().start(mode=1)
