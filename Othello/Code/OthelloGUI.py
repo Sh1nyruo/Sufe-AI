@@ -709,15 +709,17 @@ class OthelloGUI:
                     if beta <= alpha:
                         break
                 return best, best_move
-        start_time = time.perf_counter()    
+        # start_time = time.perf_counter()    
         a = minmax(5, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
-        end_time = time.perf_counter()
+        # end_time = time.perf_counter()
+        '''
         if end_time - start_time < 0.1:
             a = minmax(7, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
         elif end_time - start_time < 1:
             a = minmax(6, 0, self.mainBoard, tile, tile, [], -inf, inf)[1]
         end_time = time.perf_counter()
         print("AI:",end_time - start_time)
+        '''
         return a
         
     def white_move(self, tile='white'):
@@ -726,7 +728,7 @@ class OthelloGUI:
         :param tile: 棋子颜色的字符串，值为“white”或者“black”,在此函数中，默认为白色！
         :return: 返回一个最佳的落子位置[x,y]
         '''
-        # return self.get_baseline_move(tile, 1)
+        # return self.get_baseline_move(tile, 0)
         return self.get_AI_move(tile)
 
     def black_move(self, tile='black'):
@@ -736,8 +738,8 @@ class OthelloGUI:
         :return: 返回一个最佳的落子位置[x,y]
         '''
         # baseline的策略也可自定义，通过设置get_baseline_move函数的baseline_num进行调用
-        #return self.get_baseline_move(tile, 1)
-        return self.get_AI_move(tile)
+        return self.get_baseline_move(tile, 0)
+        # return self.get_AI_move(tile)
 
     def program_go(self, playerTile):
         '''
@@ -846,7 +848,6 @@ class OthelloGUI:
             return
         self.cv.pack()
         self.root.mainloop()
-
 
 if __name__ == '__main__':
     # mode=0 是人机对战模式、mode=1是机器对战模式
