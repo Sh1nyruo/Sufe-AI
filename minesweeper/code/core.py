@@ -1,9 +1,4 @@
 # coding=utf8
-"""
-@author:kinegratii(kinegratii@yeah.net)
-@Version:1.0.1
-Update on 2014.05.04
-"""
 from __future__ import unicode_literals
 
 import random
@@ -12,6 +7,7 @@ try:
     import queue
 except ImportError:
     import Queue as queue
+import copy
 
 
 class Map(object):
@@ -20,7 +16,7 @@ class Map(object):
     DOUBLE_MINE_FLAG = -2
     TRIPLE_MINE_FLAG = -3
 
-    def __init__(self, height, width, mine_pos_list, double_mine_number, triple_mine_number):
+    def __init__(self, height, width, mine_pos_list, double_mine_number, triple_mine_number, mine_map):
         self._height = height
         self._width = width
         self._mine_number = 0
@@ -29,7 +25,8 @@ class Map(object):
         self._double_mine_index_list = []
         self._triple_mine_number = triple_mine_number
         self._triple_mine_index_list = []
-        self._generate_distribute_map()
+        # self._generate_distribute_map()
+        self._generate_distribute_map_fixed(mine_map)
 
     @property
     def height(self):
@@ -101,6 +98,11 @@ class Map(object):
                             self._distribute_map[d_x][d_y] != Map.TRIPLE_MINE_FLAG:
                         self._distribute_map[d_x][d_y] += 1
             current_index += 1
+        # print(self._distribute_map)
+
+    def _generate_distribute_map_fixed(self, mine_map):
+        mine_map_new = copy.deepcopy(mine_map)
+        self._distribute_map = mine_map_new
         # print(self._distribute_map)
 
     def is_in_map(self, pos, offset=None):
@@ -297,7 +299,7 @@ class Game(object):
             for near_x in [x - 1, x, x + 1]:
                 for near_y in [y - 1, y, y + 1]:
                     if self._mine_map.is_in_map((near_x, near_y)) and self.visible_map[near_x][near_y] == -999:
-                        state = self._sweep((near_x,near_y), lighter=True)
+                        state = self._sweep((near_x, near_y), lighter=True)
         else:
             state = self._sweep(click_pos, lighter=False)
         # 踩到雷了不停止游戏

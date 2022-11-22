@@ -225,15 +225,22 @@ class GameFrame(tk.Frame):
         """
         if self.is_AI:
             light_count = 1  # 目前可以使用的灯塔数量
-            use_lighter = True
+            use_lighter = False
             state = self.game.state
+            first = True
             while state == Game.STATE_PLAY:
-                x, y = 6, 5
+                x, y = 10, 15
                 # 在区块内填写逻辑，让你的AI选择要探索的区块(x, y)
                 ###################################
                 #     这里只是一个随机选择的版本    #
-                while self.game.visible_map[x][y] != -999:
-                    x, y = random.randint(0, 19), random.randint(0, 29)
+                if first:
+                    first = False
+                    state = self.sweep_mine(x, y, lighter=False)
+                    print('(%d, %d)' % (x, y))
+                    continue
+                else:
+                    while self.game.visible_map[x][y] != -999:
+                        x, y = random.randint(0, 19), random.randint(0, 29)
 
                 ###################################
 
@@ -257,7 +264,7 @@ def main():
     当AI_or_General_Choice为1时，使用AI算法进行扫雷
     """
     score_list = []
-    AI_or_General_Choice = 0
+    AI_or_General_Choice = 1
     for i in range(1):
         map_path = './map_data/npz/array_map{}.npz'.format(str(i + 1))
         app = App(AI_or_General_Choice, map_path)

@@ -12,14 +12,14 @@ import numpy as np
 
 class GameHelpers(object):
     @staticmethod
-    def create_from_mine_index_list(height, width, mine_index_list, double_mine_number, triple_mine_number):
-        return Map(height, width, ((index // width, index % width) for index in mine_index_list), double_mine_number, triple_mine_number)
+    def create_from_mine_index_list(height, width, mine_index_list, double_mine_number, triple_mine_number, mine_map):
+        return Map(height, width, ((index // width, index % width) for index in mine_index_list), double_mine_number, triple_mine_number, mine_map)
 
     @staticmethod
     def create_from_mine_number(height, width, mine_number, double_mine_number, triple_mine_number):
         map_size = height * width
         mine_index_list = random.sample(range(0, map_size), mine_number + double_mine_number + triple_mine_number)
-        return GameHelpers.create_from_mine_index_list(height, width, mine_index_list, double_mine_number, triple_mine_number)
+        return GameHelpers.create_from_mine_index_list(height, width, mine_index_list, double_mine_number, triple_mine_number, [])
 
     @staticmethod
     def create_from_read_array(filename):
@@ -38,8 +38,27 @@ class GameHelpers(object):
                     elif mine_map[x][y] == -3:
                         triple_mine_number += 1
                     mine_index_list.append(x * width + y)
-        return GameHelpers.create_from_mine_index_list(height, width, mine_index_list, double_mine_number, triple_mine_number)
+        return GameHelpers.create_from_mine_index_list(height, width, mine_index_list, double_mine_number, triple_mine_number, [])
 
+    @staticmethod
+    def create_from_read_array_fixed(filename):
+        read_mine_map = np.load(filename)
+        double_mine_number = 0
+        triple_mine_number = 0
+        mine_map = read_mine_map['arr_0'].tolist()
+        # print(mine_map)
+        height = len(mine_map)
+        width = len(mine_map[0])
+        mine_index_list = []
+        for x in range(height):
+            for y in range(width):
+                if mine_map[x][y] == -1 or mine_map[x][y] == -2 or mine_map[x][y] == -3:
+                    if mine_map[x][y] == -2:
+                        double_mine_number += 1
+                    elif mine_map[x][y] == -3:
+                        triple_mine_number += 1
+                    mine_index_list.append(x * width + y)
+        return GameHelpers.create_from_mine_index_list(height, width, mine_index_list, double_mine_number, triple_mine_number, mine_map)
 
 class LevelMapMeta(object):
     def __init__(self, name, verbose, height, width, mine_number, double_mine_number, triple_mine_number):
@@ -75,7 +94,8 @@ class LevelConfig(object):
 
     def map(self, name):
         # meta = self.data[name]
-        return GameHelpers.create_from_read_array(name)
+        # return GameHelpers.create_from_read_array(name)
+        return GameHelpers.create_from_read_array_fixed(name)
         # return GameHelpers.create_from_mine_number(meta.height, meta.width, meta.mine_number, meta.double_mine_number)
 
 
