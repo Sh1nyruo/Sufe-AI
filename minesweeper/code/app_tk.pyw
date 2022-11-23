@@ -16,8 +16,7 @@ from helpers import level_config
 import widgets
 import static
 import random
-
-
+import numpy as np
 class App(tk.Frame):
     def __init__(self, is_AI, map_path):
         tk.Frame.__init__(self)
@@ -223,37 +222,120 @@ class GameFrame(tk.Frame):
         4. 当除了雷以外的单元格均被探索，游戏结束！
         5. 为降低难度，可以使用灯塔道具查看已探索点的周围情况，但该道具使用次数受限！
         """
+        # 上下左右列表
+        dx = [0,0,1,-1,1,-1,-1,1]
+        dy = [1,-1,0,0,1,-1,1,-1]
+        # 化简约束
+        def reduce(constraintList):
+            for eq_i in constraintList:
+                for eq_j in constraintList:
+                    if eq_i[0] == eq_j[0] or len(eq_j[0]) == 0:
+                        continue
+                    elif set(eq_i[0]).issubset(set(eq_j[0])):
+                        eq_j[0] = list(set(eq_j[0])-set(eq_i[0]))
+                        eq_j[1] = eq_j[1] - eq_i[1]
+
+                    elif set(eq_j[0]).issubset(set(eq_i[0])):
+                        eq_i[0] = list(set(eq_i[0])-set(eq_j[0]))
+                        eq_i[1] = eq_i[1] - eq_j[1]
+
+            return constraintList
+        
+        # 推断约束
+        def deduce(predicted, constraintList):
+            for c in constraintList:
+                if len(c[0]) == 0:
+                    continue
+                elif c[1] == 0:
+                    for coordinate in c[0]:
+                        predicted[coordinate[0]][coordinate[1]] = 999
+                elif len(c[0]) == 1:
+                    x,y = c[0][0]
+                    predicted[x][y] = c[1]
+
+                elif (-c[1]) == 3*len(c[0]):
+                    for coordinate in c[0]:
+                        predicted[coordinate[0]][coordinate[1]] = -3
+            return predicted
+
+        # 更新预测表
+        def updatePrediction(predicted, actual):
+            for i in range(20):
+                for j in range(30):
+                    if actual[i][j] == -999:
+                        continue
+                    else:
+                        predicted[i][j] = actual[i][j]
+            
+            constraints = []
+            for i in range(20):
+                for j in range(30):
+                    val = predicted[i][j]
+                    constraint = []
+                    if predicted[i][j]>0 and predicted[i][j]!=999:
+                        for index in range(8):
+                            idx = i + dx[index]
+                            jdx = j + dy[index]
+                            if idx < 0 or jdx < 0 or idx>=20 or jdx>=30:
+                                continue
+                            if predicted[idx][jdx] != -999 and predicted[idx][jdx] < 0:
+                                val += predicted[idx][jdx]
+                                continue
+                            elif predicted[idx][jdx] >=0:
+                                continue
+                            elif predicted[idx][jdx] == -999:
+                                constraint.append((idx,jdx))
+                    if len(constraint) != 0:
+                        constraints.append([constraint,-val])
+            constraints = reduce(constraints)            
+            predicted = deduce(predicted, constraints)
+            
+            
+            
+            return predicted
+            
+            
         if self.is_AI:
+            # 使用CSP策略
             light_count = 1  # 目前可以使用的灯塔数量
             use_lighter = False
             state = self.game.state
             first = True
+            deduced = 0
+            guessed = 0
+            # 预测地图
+            predicted_map = np.zeros((20,30),dtype=int) - 999
+            
+            predicted_map[10,15] = 999 # 表示安全但未知
+            
             while state == Game.STATE_PLAY:
-                x, y = 10, 15
-                # 在区块内填写逻辑，让你的AI选择要探索的区块(x, y)
-                ###################################
-                #     这里只是一个随机选择的版本    #
-                if first:
-                    first = False
-                    state = self.sweep_mine(x, y, lighter=False)
-                    print('(%d, %d)' % (x, y))
-                    continue
+                safe_coordinates = np.argwhere(predicted_map==999)
+                if len(safe_coordinates) > 0:
+                    for coordinate in safe_coordinates:
+                        x,y = coordinate
+                        if self.game.visible_map[x][y]==-999:
+                            lighter = use_lighter if light_count > 0 else False
+                            if lighter:
+                                light_count -= 1
+                            state = self.sweep_mine(x,y,lighter=lighter)
+                            # print('(%d, %d)' % (x, y))
+                            deduced += 1
+                            predicted_map = updatePrediction(predicted_map, self.game.visible_map)
+                
                 else:
-                    while self.game.visible_map[x][y] != -999:
-                        x, y = random.randint(0, 19), random.randint(0, 29)
-
-                ###################################
-
-                # 探索区块(x, y), 使用lighter时令use_lighter = True, 注意: 使用灯塔道具的次数有限！
-                lighter = use_lighter if light_count > 0 else False
-                if lighter:
-                    light_count -= 1
-                state = self.sweep_mine(x, y, lighter=lighter)
-
-                # 输出每一步的选择
-                print('(%d, %d)' % (x, y))
-
+                    x, y = random.randint(0, 19), random.randint(0, 29)
+                    if self.game.visible_map[x][y] == -999:
+                        use_lighter = True
+                        lighter = use_lighter if light_count > 0 else False
+                        if lighter:
+                            light_count -= 1
+                        # print('(%d, %d)' % (x, y))    
+                        state = self.sweep_mine(x, y, lighter=lighter)
+                        predicted_map = updatePrediction(predicted_map, self.game.visible_map)
+                        guessed += 1
+                    
             # 输出当前的分数
+            print(deduced," ",guessed)
             print(self.game.score)
 
 
@@ -265,7 +347,7 @@ def main():
     """
     score_list = []
     AI_or_General_Choice = 1
-    for i in range(1):
+    for i in range(2):
         map_path = './map_data/npz/array_map{}.npz'.format(str(i + 1))
         app = App(AI_or_General_Choice, map_path)
         app.map_frame.start()
