@@ -239,24 +239,37 @@ class GameFrame(tk.Frame):
                         eq_i[0] = list(set(eq_i[0])-set(eq_j[0]))
                         eq_i[1] = eq_i[1] - eq_j[1]
 
-            return constraintList
+            unique = []
+            for i in range(len(constraintList)):
+                if constraintList[i] not in unique:
+                    unique.append(constraintList[i])
+            
+            if unique == constraintList:
+                print("Useless")
+            else:
+                print("Wow,Nice!")
+            
+            return unique
         
         # 推断约束
         def deduce(predicted, constraintList):
             for c in constraintList:
                 if len(c[0]) == 0:
+                    constraintList.remove(c)
                     continue
                 elif c[1] == 0:
                     for coordinate in c[0]:
                         predicted[coordinate[0]][coordinate[1]] = 999
+                    constraintList.remove(c)
                 elif len(c[0]) == 1:
                     x,y = c[0][0]
                     predicted[x][y] = c[1]
-
+                    constraintList.remove(c)
                 elif (-c[1]) == 3*len(c[0]):
                     for coordinate in c[0]:
                         predicted[coordinate[0]][coordinate[1]] = -3
-            return predicted
+
+            return predicted,constraintList
 
         # 更新预测表
         def updatePrediction(predicted, actual):
@@ -288,13 +301,62 @@ class GameFrame(tk.Frame):
                     if len(constraint) != 0:
                         constraints.append([constraint,-val])
             constraints = reduce(constraints)            
-            predicted = deduce(predicted, constraints)
+            predicted,constraints = deduce(predicted, constraints)
             
+            return predicted, constraints
+        
+        # 分割约束
+        def constraintsSplit(allConstraints):
+            constraintsBlock = []
+            while len(allConstraints) > 0:
+                pass
+        
+        # 无法确定时选择期望损失最小的雷    
+        def miniCost(predicted, constraints):
+            Flag = True
+            x,y = 0,0
+            cnt = 0
+            # 如果有未挖的必定安全格，则返回
+            safe_coordinates = np.argwhere(predicted==999)
+            if len(safe_coordinates) > 0:
+                x,y = safe_coordinates[0][0],safe_coordinates[0],1
+                return x,y              
             
+            # 利用回溯法计算各格期望代价
             
-            return predicted
+            #constraintsList = constraintsSplit(constraints)
             
+            while Flag:
+                coordinateList = np.argwhere(predicted==-999)
+                np.random.shuffle(coordinateList)
+                
+                x,y = coordinateList[0][0],coordinateList[0][1]
+                flag2 = False
+                for equation in constraints:
+                    for coordinate in equation[0]:
+                        if (x,y) == coordinate:
+                            flag2 = True
+                        if flag2:
+                            break
+                    if flag2:
+                        break
+                if flag2 == False:
+                    break 
+                cnt += 1
+                if cnt > 100:
+                    break
+            '''    
+            numOfdeducedSingle = np.count_nonzero(predicted==-1)
+            numOfdeducedDouble = np.count_nonzero(predicted==-2)
+            numOfdeducedTriple = np.count_nonzero(predicted==-3)
             
+            numOfRestSingle = 68 - numOfdeducedSingle
+            numOfdeducedDouble = 8 - numOfdeducedDouble
+            numOfdeducedTriple = 4 - numOfdeducedTriple
+            
+            '''
+            return x,y    
+        
         if self.is_AI:
             # 使用CSP策略
             light_count = 1  # 目前可以使用的灯塔数量
@@ -314,16 +376,17 @@ class GameFrame(tk.Frame):
                     for coordinate in safe_coordinates:
                         x,y = coordinate
                         if self.game.visible_map[x][y]==-999:
-                            lighter = use_lighter if light_count > 0 else False
-                            if lighter:
-                                light_count -= 1
-                            state = self.sweep_mine(x,y,lighter=lighter)
+                            state = self.sweep_mine(x,y,False)
                             # print('(%d, %d)' % (x, y))
                             deduced += 1
-                            predicted_map = updatePrediction(predicted_map, self.game.visible_map)
+                            predicted_map, allConstraint = updatePrediction(predicted_map, self.game.visible_map)
                 
                 else:
-                    x, y = random.randint(0, 19), random.randint(0, 29)
+                    # predicted_map, allConstraint = updatePrediction(predicted_map, self.game.visible_map)
+                    
+                    x, y = miniCost(predicted_map,allConstraint)
+                    
+                    # x, y = random.randint(0, 19), random.randint(0, 29)
                     if self.game.visible_map[x][y] == -999:
                         use_lighter = True
                         lighter = use_lighter if light_count > 0 else False
@@ -331,7 +394,7 @@ class GameFrame(tk.Frame):
                             light_count -= 1
                         # print('(%d, %d)' % (x, y))    
                         state = self.sweep_mine(x, y, lighter=lighter)
-                        predicted_map = updatePrediction(predicted_map, self.game.visible_map)
+                        predicted_map, allConstraint = updatePrediction(predicted_map, self.game.visible_map)
                         guessed += 1
                     
             # 输出当前的分数
@@ -347,7 +410,7 @@ def main():
     """
     score_list = []
     AI_or_General_Choice = 1
-    for i in range(2):
+    for i in range(10):
         map_path = './map_data/npz/array_map{}.npz'.format(str(i + 1))
         app = App(AI_or_General_Choice, map_path)
         app.map_frame.start()
