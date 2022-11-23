@@ -17,6 +17,7 @@ import widgets
 import static
 import random
 import numpy as np
+from copy import deepcopy
 class App(tk.Frame):
     def __init__(self, is_AI, map_path):
         tk.Frame.__init__(self)
@@ -238,37 +239,50 @@ class GameFrame(tk.Frame):
                     elif set(eq_j[0]).issubset(set(eq_i[0])):
                         eq_i[0] = list(set(eq_i[0])-set(eq_j[0]))
                         eq_i[1] = eq_i[1] - eq_j[1]
+                        
+            emptyConstraint = [[],0]
+            cnt = 0
+            for c in constraintList:
+                if len(c[0]) == 0:
+                    cnt += 1
+            for i in range(cnt):
+                constraintList.remove(emptyConstraint)
 
             unique = []
             for i in range(len(constraintList)):
                 if constraintList[i] not in unique:
                     unique.append(constraintList[i])
-            
+            '''
             if unique == constraintList:
                 print("Useless")
             else:
                 print("Wow,Nice!")
-            
+            '''
             return unique
         
         # 推断约束
         def deduce(predicted, constraintList):
+            tobeRemoved = []
             for c in constraintList:
                 if len(c[0]) == 0:
-                    constraintList.remove(c)
+                    tobeRemoved.append(c)
                     continue
                 elif c[1] == 0:
                     for coordinate in c[0]:
                         predicted[coordinate[0]][coordinate[1]] = 999
-                    constraintList.remove(c)
+                    tobeRemoved.append(c)
                 elif len(c[0]) == 1:
                     x,y = c[0][0]
                     predicted[x][y] = c[1]
-                    constraintList.remove(c)
+                    tobeRemoved.append(c)
                 elif (-c[1]) == 3*len(c[0]):
                     for coordinate in c[0]:
                         predicted[coordinate[0]][coordinate[1]] = -3
+                    tobeRemoved.append(c)
 
+            for i in range(len(tobeRemoved)):
+                constraintList.remove(tobeRemoved[i])
+            
             return predicted,constraintList
 
         # 更新预测表
@@ -306,10 +320,82 @@ class GameFrame(tk.Frame):
             return predicted, constraints
         
         # 分割约束
-        def constraintsSplit(allConstraints):
-            constraintsBlock = []
-            while len(allConstraints) > 0:
-                pass
+        def constraintsSplit(ConstraintsList):
+            allConstraints = deepcopy(ConstraintsList)
+            disjointConstraints = []
+            coordinateList = []
+
+            for equation in allConstraints:
+                for coordinate in equation[0]:
+                    if coordinate not in coordinateList:
+                        coordinateList.append(coordinate)
+            
+
+            union_set_index = {coordinate: None for coordinate in coordinateList}
+            
+            for coordinate in coordinateList:
+                if union_set_index[coordinate] is not None:
+                    continue
+                
+                index = 0
+                while len(allConstraints)>0 and index < len(allConstraints):
+                    if coordinate in allConstraints[index][0]:
+                        insert_set_index = -1
+                        for jointCoordinate in allConstraints[index][0]:
+                            if union_set_index[jointCoordinate] is not None:
+                                insert_set_index = union_set_index[jointCoordinate]
+                                break
+                        if insert_set_index == -1:
+                            insert_set_index = len(disjointConstraints)
+                        
+                        for joint_coordinate in allConstraints[index][0]:
+                            union_set_index[joint_coordinate] = insert_set_index
+                        
+                        if insert_set_index == len(disjointConstraints):
+                            disjointConstraints.append([])
+                            disjointConstraints[insert_set_index].append(allConstraints[index])
+                        else:
+                            disjointConstraints[insert_set_index].append(allConstraints[index])
+                            
+                        allConstraints.remove(allConstraints[index])
+                    else:
+                        index += 1
+            
+            union_constraint_set = []
+            for i in range(len(allConstraints)):
+                set_index = set()
+                for coordinate in allConstraints[i][0]:
+                    set_index.add(union_set_index[coordinate])
+                union_constraint_set.append(list(set_index))
+                    
+            # final_disjointConstraints = []
+            for idx,tobeunioned in enumerate(union_constraint_set):
+                if len(tobeunioned) == 1:
+                    disjointConstraints[tobeunioned[0]].append(allConstraints[idx])
+                else:
+                    first_index = min(tobeunioned[0],tobeunioned[1])
+                    second_index = max(tobeunioned[0],tobeunioned[1])
+                    disjointConstraints[first_index].extend(disjointConstraints[second_index])
+                    disjointConstraints[first_index].append(allConstraints[idx])
+                    disjointConstraints.pop(second_index)
+                    
+                    for coordinate, set_index in union_set_index.items():
+                        if set_index == second_index:
+                            union_set_index[coordinate] = first_index
+                        elif set_index > second_index:
+                            union_set_index[coordinate] -= 1
+                    for set_tobeUnioned in union_constraint_set:
+                        for cd_idx in range(len(set_tobeUnioned)):
+                            if set_tobeUnioned[cd_idx] == second_index:
+                                set_tobeUnioned[cd_idx] = first_index
+                            elif set_tobeUnioned[cd_idx] > second_index:
+                                set_tobeUnioned[cd_idx] -= 1
+
+            for i in range(len(disjointConstraints)):
+                disjointConstraints[i] = reduce(disjointConstraints[i])
+            
+            return disjointConstraints
+            
         
         # 无法确定时选择期望损失最小的雷    
         def miniCost(predicted, constraints):
@@ -323,8 +409,35 @@ class GameFrame(tk.Frame):
                 return x,y              
             
             # 利用回溯法计算各格期望代价
+            # 先分割不相干的约束减少计算量
+            constraintsList = constraintsSplit(constraints)
             
-            #constraintsList = constraintsSplit(constraints)
+            numOfdeducedSingle = np.count_nonzero(predicted==-1)
+            numOfdeducedDouble = np.count_nonzero(predicted==-2)
+            numOfdeducedTriple = np.count_nonzero(predicted==-3)
+            
+            numOfRestSingle = 68 - numOfdeducedSingle
+            numOfRestdDouble = 8 - numOfdeducedDouble
+            numOfRestTriple = 4 - numOfdeducedTriple
+                        
+            coordinateList = np.argwhere(predicted==-999)
+            numOfRestCells = len(coordinateList)
+            costOfAllCells = {(coordinate[0],coordinate[1]): -(numOfRestSingle+10*numOfRestdDouble+10*numOfRestTriple)/numOfRestCells for coordinate in coordinateList}
+            
+            costOfRelatedCells = {}
+            for constraintSet in constraintsList:
+                pass
+                # costOfthesesCells = calculate(constraintSet)
+                # costOfRelatedCells.update(costOfthesesCells)
+            
+            for coordinate, cost in costOfRelatedCells.items():
+                costOfAllCells[coordinate] = cost
+            
+            costOfAllCells = sorted(costOfAllCells.items(),key=lambda x:x[1])
+            x,y = costOfAllCells[0][0]
+            use_lighter = True if costOfAllCells[0][1] <= -1 else False
+            return x,y,use_lighter
+
             
             while Flag:
                 coordinateList = np.argwhere(predicted==-999)
@@ -346,13 +459,7 @@ class GameFrame(tk.Frame):
                 if cnt > 100:
                     break
             '''    
-            numOfdeducedSingle = np.count_nonzero(predicted==-1)
-            numOfdeducedDouble = np.count_nonzero(predicted==-2)
-            numOfdeducedTriple = np.count_nonzero(predicted==-3)
-            
-            numOfRestSingle = 68 - numOfdeducedSingle
-            numOfdeducedDouble = 8 - numOfdeducedDouble
-            numOfdeducedTriple = 4 - numOfdeducedTriple
+
             
             '''
             return x,y    
@@ -371,6 +478,7 @@ class GameFrame(tk.Frame):
             predicted_map[10,15] = 999 # 表示安全但未知
             
             while state == Game.STATE_PLAY:
+                # break
                 safe_coordinates = np.argwhere(predicted_map==999)
                 if len(safe_coordinates) > 0:
                     for coordinate in safe_coordinates:
@@ -384,11 +492,11 @@ class GameFrame(tk.Frame):
                 else:
                     # predicted_map, allConstraint = updatePrediction(predicted_map, self.game.visible_map)
                     
-                    x, y = miniCost(predicted_map,allConstraint)
+                    x, y, use_lighter = miniCost(predicted_map,allConstraint)
                     
                     # x, y = random.randint(0, 19), random.randint(0, 29)
                     if self.game.visible_map[x][y] == -999:
-                        use_lighter = True
+                        # use_lighter = True
                         lighter = use_lighter if light_count > 0 else False
                         if lighter:
                             light_count -= 1
@@ -396,7 +504,8 @@ class GameFrame(tk.Frame):
                         state = self.sweep_mine(x, y, lighter=lighter)
                         predicted_map, allConstraint = updatePrediction(predicted_map, self.game.visible_map)
                         guessed += 1
-                    
+            
+            # print("Light: ",light_count)        
             # 输出当前的分数
             print(deduced," ",guessed)
             print(self.game.score)
