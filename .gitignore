@@ -1,5 +1,8 @@
 #pdf
 *.pdf
+#zip rar
+*.zip
+*.rar
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
