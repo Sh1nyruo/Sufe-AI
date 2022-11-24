@@ -18,6 +18,7 @@ import static
 import random
 import numpy as np
 from copy import deepcopy
+# import time
 class App(tk.Frame):
     def __init__(self, is_AI, map_path):
         tk.Frame.__init__(self)
@@ -395,7 +396,119 @@ class GameFrame(tk.Frame):
                 disjointConstraints[i] = reduce(disjointConstraints[i])
             
             return disjointConstraints
+        
+        # 判断consisitency
+        def isViolated(coordinate, value, constraintSet, rest_num):
+            if value < 0:
+                if rest_num[- value - 1] <= 0:
+                    return True
             
+            for constraint in constraintSet:
+                if coordinate in constraint[0]:
+                    if len(constraint[0]) == 1 and constraint[1] != value:
+                        return True
+                    elif len(constraint[0]) == 2 and (constraint[1] - value) < -3:
+                        return True
+                    elif value < constraint[1]:
+                        return True
+                        
+            return False
+            
+            
+            
+        # 回溯
+        def recursiveBacktracking(solution, current_assignment, constraintSet, coordinateSet, rest_num):
+            currentConstraintSet = deepcopy(constraintSet)
+            if len(current_assignment) == len(coordinateSet):
+                if current_assignment in solution:
+                    return False
+                solution.append(deepcopy(current_assignment))
+                return False
+            currentCoordinate = coordinateSet[len(current_assignment)]
+            for var in [0,-1,-2,-3]:
+                Flag = True
+                for constraint in currentConstraintSet:
+                    if currentCoordinate in constraint[0]:
+                        if isViolated(currentCoordinate, var, currentConstraintSet, rest_num):
+                            Flag = False
+                            break
+                if Flag == False:
+                    continue    
+            
+                current_assignment.append(var)
+                if var == -1:
+                    rest_num[0] -= 1
+                elif var == -2:
+                    rest_num[1] -= 1
+                elif var == -3:
+                    rest_num[2] -= 1
+                    
+                for constraint_index in range(len(currentConstraintSet)):
+                    if currentCoordinate in currentConstraintSet[constraint_index][0]:
+                        currentConstraintSet[constraint_index][0].remove(currentCoordinate)
+                        currentConstraintSet[constraint_index][1] -= var
+                
+                currentConstraintSet = reduce(currentConstraintSet)
+                
+                recursiveBacktracking(solution, current_assignment, currentConstraintSet, coordinateSet, rest_num)
+                current_assignment.pop()
+                currentConstraintSet = deepcopy(constraintSet)
+                if var == -1:
+                    rest_num[0] += 1
+                elif var == -2:
+                    rest_num[1] += 1
+                elif var == -3:
+                    rest_num[2] += 1
+                    
+            return False             
+                
+            
+        # 回溯函数
+        def backtrackingSearch(constraintSet, coordinateSet, rest_num):
+            solution = []
+            assignment = []
+            recursiveBacktracking(solution,assignment,constraintSet,coordinateSet,rest_num)
+            return solution
+            
+        
+        # 计算概率
+        def calculate(constraintSet, rest_num, cost):
+            coordinateSet = set()
+            for constraint in constraintSet:
+                for coordinate in constraint[0]:
+                    coordinateSet.add(coordinate)
+            
+            allcoordinate = list(coordinateSet)
+            
+            # 如果待确定坐标数太多，就摆烂
+            if len(allcoordinate) >= 29:
+                return {(cood[0],cood[1]): cost for cood in allcoordinate}
+            
+            costofAllcoordinate = {(cood[0],cood[1]): 0 for cood in allcoordinate}
+            
+            
+            allAssignment = backtrackingSearch(constraintSet, allcoordinate, rest_num)
+            numOfall = len(allAssignment)
+            
+            if numOfall == 0:
+                return {}
+            
+            for index,coordinate in enumerate(allcoordinate):
+                numOfSingle = 0
+                numOfDouble = 0
+                numOfTriple = 0
+                for i in range(numOfall):
+                    if allAssignment[i][index] == -1:
+                        numOfSingle += 1
+                    elif allAssignment[i][index] == -2:
+                        numOfDouble += 1
+                    elif allAssignment[i][index] == -3:
+                        numOfTriple += 1
+                cost = - numOfSingle/numOfall - 10*numOfDouble/numOfall - 10*numOfTriple/numOfall
+                costofAllcoordinate[(coordinate[0],coordinate[1])] = cost
+            
+            return costofAllcoordinate
+                
         
         # 无法确定时选择期望损失最小的雷    
         def miniCost(predicted, constraints):
@@ -412,64 +525,52 @@ class GameFrame(tk.Frame):
             # 先分割不相干的约束减少计算量
             constraintsList = constraintsSplit(constraints)
             
+            # 计算已经确定为雷的数量
             numOfdeducedSingle = np.count_nonzero(predicted==-1)
             numOfdeducedDouble = np.count_nonzero(predicted==-2)
             numOfdeducedTriple = np.count_nonzero(predicted==-3)
-            
+            # 计算剩余雷的数量
             numOfRestSingle = 68 - numOfdeducedSingle
             numOfRestdDouble = 8 - numOfdeducedDouble
             numOfRestTriple = 4 - numOfdeducedTriple
-                        
+            
+            numOfrest = [numOfRestSingle, numOfRestdDouble, numOfRestTriple]
+            # 计算所有未知格的cost
             coordinateList = np.argwhere(predicted==-999)
             numOfRestCells = len(coordinateList)
-            costOfAllCells = {(coordinate[0],coordinate[1]): -(numOfRestSingle+10*numOfRestdDouble+10*numOfRestTriple)/numOfRestCells for coordinate in coordinateList}
+            
+            common_cost = -(numOfRestSingle+10*numOfRestdDouble+10*numOfRestTriple)/numOfRestCells
+            costOfAllCells = {(coordinate[0],coordinate[1]): common_cost for coordinate in coordinateList}
+            
             
             costOfRelatedCells = {}
             for constraintSet in constraintsList:
-                pass
-                # costOfthesesCells = calculate(constraintSet)
-                # costOfRelatedCells.update(costOfthesesCells)
+                # pass
+                costOfthesesCells = calculate(constraintSet, numOfrest, common_cost)
+                costOfRelatedCells.update(costOfthesesCells)
             
             for coordinate, cost in costOfRelatedCells.items():
                 costOfAllCells[coordinate] = cost
             
-            costOfAllCells = sorted(costOfAllCells.items(),key=lambda x:x[1])
-            x,y = costOfAllCells[0][0]
-            use_lighter = True if costOfAllCells[0][1] <= -1 else False
+            costOfAllCells = sorted(costOfAllCells.items(),key=lambda x:x[1], reverse=True)
+
+            # 引入随机性
+            counter = 0
+            while counter < len(costOfAllCells) and costOfAllCells[0][1] == costOfAllCells[counter][1]:
+                counter += 1
+          
+            sameCostCoordinate = deepcopy(costOfAllCells[:counter])
+            random.shuffle(sameCostCoordinate)
+            
+            x,y = sameCostCoordinate[0][0]
+            use_lighter = True if sameCostCoordinate[0][1] <= -0.8 else False              
             return x,y,use_lighter
-
             
-            while Flag:
-                coordinateList = np.argwhere(predicted==-999)
-                np.random.shuffle(coordinateList)
-                
-                x,y = coordinateList[0][0],coordinateList[0][1]
-                flag2 = False
-                for equation in constraints:
-                    for coordinate in equation[0]:
-                        if (x,y) == coordinate:
-                            flag2 = True
-                        if flag2:
-                            break
-                    if flag2:
-                        break
-                if flag2 == False:
-                    break 
-                cnt += 1
-                if cnt > 100:
-                    break
-            '''    
-
-            
-            '''
-            return x,y    
-        
         if self.is_AI:
             # 使用CSP策略
             light_count = 1  # 目前可以使用的灯塔数量
             use_lighter = False
             state = self.game.state
-            first = True
             deduced = 0
             guessed = 0
             # 预测地图
@@ -478,7 +579,7 @@ class GameFrame(tk.Frame):
             predicted_map[10,15] = 999 # 表示安全但未知
             
             while state == Game.STATE_PLAY:
-                # break
+                # 先把能挖的安全格全挖了
                 safe_coordinates = np.argwhere(predicted_map==999)
                 if len(safe_coordinates) > 0:
                     for coordinate in safe_coordinates:
@@ -490,8 +591,7 @@ class GameFrame(tk.Frame):
                             predicted_map, allConstraint = updatePrediction(predicted_map, self.game.visible_map)
                 
                 else:
-                    # predicted_map, allConstraint = updatePrediction(predicted_map, self.game.visible_map)
-                    
+                    # 没有安全格就算概率，找出期望代价最小的那个
                     x, y, use_lighter = miniCost(predicted_map,allConstraint)
                     
                     # x, y = random.randint(0, 19), random.randint(0, 29)
@@ -507,8 +607,8 @@ class GameFrame(tk.Frame):
             
             # print("Light: ",light_count)        
             # 输出当前的分数
-            print(deduced," ",guessed)
-            print(self.game.score)
+            # print(deduced," ",guessed)
+            # print(self.game.score)
 
 
 def main():
@@ -520,6 +620,7 @@ def main():
     score_list = []
     AI_or_General_Choice = 1
     for i in range(10):
+        # start_time = time.time()
         map_path = './map_data/npz/array_map{}.npz'.format(str(i + 1))
         app = App(AI_or_General_Choice, map_path)
         app.map_frame.start()
@@ -527,8 +628,12 @@ def main():
             app.mainloop()
         score = app.map_frame.game.score
         score_list.append(score)
+        # end_time = time.time()
+        # print("Map{}: ".format(i+1),end_time-start_time)
     print(score_list)
-
-
+    # print(np.average(np.array(score_list)))
+    # print(len(np.argwhere(np.array(score_list)<=5)))
+    # print(len(np.argwhere(np.array(score_list)<=0)))
+    # print(len(np.argwhere(np.array(score_list)>=9)))
 if __name__ == '__main__':
     main()
